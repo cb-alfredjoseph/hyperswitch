@@ -9,11 +9,13 @@ use ::common_utils::{
     request::RequestContent,
 };
 use error_stack::{IntoReport, ResultExt};
+use router_env::logger;
 use transformers as nuvei;
 
 use super::utils::{self, RouterData};
 use crate::{
     configs::settings,
+    connector::{utils as connector_utils, utils as conn_utils},
     core::{
         errors::{self, CustomResult},
         payments,
@@ -168,9 +170,40 @@ impl
     ) -> CustomResult<RequestContent, errors::ConnectorError> {
         let meta: nuvei::NuveiMeta = utils::to_connector_meta(req.request.connector_meta.clone())?;
         let connector_req = nuvei::NuveiPaymentsRequest::try_from((req, meta.session_token))?;
-
+        println!("NuveiPaymentRequest1111 ---  ");
+        println!("NuveiPaymentRequest ---  {:?}", &connector_req);
+       // logger::info!(connector_request_body=?&connector_req);
         Ok(RequestContent::Json(Box::new(connector_req)))
     }
+
+
+
+
+
+ /*   fn get_request_body(
+        &self,
+        req: &types::PaymentsCompleteAuthorizeRouterData,
+        _connectors: &settings::Connectors,
+    ) -> CustomResult<RequestContent, errors::ConnectorError> {
+        let meta: nuvei::NuveiMeta = utils::to_connector_meta(req.request.connector_meta.clone())?;
+        let connector_req = nuvei::NuveiPaymentsRequest::try_from((req, meta.session_token))?;
+        let req = types::RequestBody::log_and_get_request_body(
+            &connector_req,
+            crate::utils::Encode::<nuvei::NuveiPaymentsRequest>::encode_to_string_of_json,
+        )
+            .change_context(errors::ConnectorError::RequestEncodingFailed)?;
+
+
+
+        /* crate::utils::Encode::<crate::types::storage::Refund>::encode_to_string_of_json(
+             &updated_refund,
+         )*/
+        //   println!("connector_req nuvei   {:?}", &connector_req);
+        Ok(RequestContent::Json(Box::new(connector_req)))
+    }*/
+
+
+
     fn build_request(
         &self,
         req: &types::PaymentsCompleteAuthorizeRouterData,
@@ -408,6 +441,8 @@ impl ConnectorIntegration<api::Capture, types::PaymentsCaptureData, types::Payme
         _connectors: &settings::Connectors,
     ) -> CustomResult<RequestContent, errors::ConnectorError> {
         let connector_req = nuvei::NuveiPaymentFlowRequest::try_from(req)?;
+        println!("NuveiPaymentFlowRequest3333 ---  ");
+        println!("NuveiPaymentFlowRequest ---  {:?}", &connector_req);
         Ok(RequestContent::Json(Box::new(connector_req)))
     }
 
@@ -563,7 +598,9 @@ impl ConnectorIntegration<api::Authorize, types::PaymentsAuthorizeData, types::P
         _connectors: &settings::Connectors,
     ) -> CustomResult<RequestContent, errors::ConnectorError> {
         let connector_req = nuvei::NuveiPaymentsRequest::try_from((req, req.get_session_token()?))?;
-
+        println!("NuveiPaymentRequest2222 ---  ");
+        println!("NuveiPaymentRequest ---  {:?}", &connector_req);
+        //logger::info!(connector_request_body=?RequestContent::Json(Box::new(connector_req.clone())));
         Ok(RequestContent::Json(Box::new(connector_req)))
     }
 
@@ -729,7 +766,8 @@ impl ConnectorIntegration<InitPayment, types::PaymentsAuthorizeData, types::Paym
         _connectors: &settings::Connectors,
     ) -> CustomResult<RequestContent, errors::ConnectorError> {
         let connector_req = nuvei::NuveiPaymentsRequest::try_from((req, req.get_session_token()?))?;
-
+        println!("NuveiPaymentRequest4444 ---  ");
+        println!("NuveiPaymentRequest ---  {:?}", &connector_req);
         Ok(RequestContent::Json(Box::new(connector_req)))
     }
 
@@ -806,6 +844,8 @@ impl ConnectorIntegration<api::Execute, types::RefundsData, types::RefundsRespon
         _connectors: &settings::Connectors,
     ) -> CustomResult<RequestContent, errors::ConnectorError> {
         let connector_req = nuvei::NuveiPaymentFlowRequest::try_from(req)?;
+        println!("NuveiPaymentFlowRequest4444 ---  ");
+        println!("NuveiPaymentFlowRequest ---  {:?}", &connector_req);
         Ok(RequestContent::Json(Box::new(connector_req)))
     }
 
