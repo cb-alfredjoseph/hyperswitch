@@ -516,7 +516,6 @@ pub struct CompleteAuthorizeData {
     pub connector_transaction_id: Option<String>,
     pub connector_meta: Option<serde_json::Value>,
     pub complete_authorize_url: Option<String>,
-    pub related_transaction_id:  Option<String>,
     pub metadata: Option<pii::SecretSerdeValue>,
 }
 
