@@ -790,12 +790,14 @@ impl<F>
             | payments::PaymentMethodData::MandatePayment  => {
                 println!("mandate flow 111 ----");
                 let connector_mandate_id = &item.request.connector_mandate_id();
-                // connector_mandate_id.is_some()
-                let related_transaction_id = if item.is_three_ds() {
+                let related_transaction_id =  item.request.related_transaction_id.clone();
+
+                /*let related_transaction_id = if item.is_three_ds() {
                     item.request.related_transaction_id.clone()
                 } else {
+                    println!("related_transaction_id None  ----");
                     None
-                };
+                };*/
                     Ok(NuveiPaymentsRequest {
                         //related_transaction_id: Some("711000000031766334".to_string()),
                         related_transaction_id,
@@ -803,11 +805,7 @@ impl<F>
                         user_token_id: Some(item.request.get_email()?),
                         payment_option: PaymentOption {
                             user_payment_option_id: connector_mandate_id.clone(),
-                            card: None,
-                            redirect_url: None,
-                            alternative_payment_method: None,
-                            billing_address: None,
-                            // ..Default::default()
+                             ..Default::default()
                         },
                         ..Default::default()
                     })
