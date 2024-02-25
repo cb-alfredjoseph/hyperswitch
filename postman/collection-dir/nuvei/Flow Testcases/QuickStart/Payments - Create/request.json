@@ -12,7 +12,86 @@
   ],
   "body": {
     "mode": "raw",
-    "raw": "{\n    \"amount\": 100,\n    \"currency\": \"USD\",\n    \"confirm\": true,\n    \"capture_method\": \"automatic\",\n    \"connector\":[\"nuvei\"],\n    \n    \n    \"customer_id\": \"futurebilling\",\n    \"email\": \"guest@example.com\",\n    \"name\": \"John Doe\",\n    \"phone\": \"999999999\",\n    \"phone_country_code\": \"+65\",\n    \"description\": \"testing\",\n    \"authentication_type\": \"no_three_ds\",\n    \"return_url\": \"https://google.com\",\n    \"payment_method\": \"card\",\n    \"payment_method_type\": \"credit\",\n    \n    \"setup_future_usage\": \"off_session\",\n    \n    \"payment_method_data\": {\n        \"card\": {\n            \"card_number\": \"4111111111111111\", \n            \"card_exp_month\": \"12\",\n            \"card_exp_year\": \"2030\",\n            \"card_holder_name\": \"joseph Doe\",\n            \"card_cvc\": \"123\"\n        }\n    },\n    \"mandate_data\": {\n        \"customer_acceptance\": {\n            \"acceptance_type\": \"offline\",\n            \"accepted_at\": \"1963-05-03T04:07:52.723Z\",\n            \"online\": {\n                \"ip_address\": \"127.0.0.1\",\n                \"user_agent\": \"amet irure esse\"\n            }\n        },\n        \"mandate_type\": {\n            \"multi_use\": {\n                \"amount\": 100,\n                \"currency\": \"USD\",\n                \"metadata\": {\n                    \"frequency\": \"1\"\n                }\n                ,\n                \"end_date\": \"2025-05-03T04:07:52.723Z\"\n            }\n        }\n    },\n    \"billing\": {\n        \"address\": {\n            \"line1\": \"1467\",\n            \"line2\": \"jkjj Street\",\n            \"line3\": \"no 1111 Street\",\n            \"city\": \"San Fransico\",\n            \"state\": \"California\",\n            \"zip\": \"94122\",\n            \"country\": \"JP\",\n            \"first_name\": \"joseph\",\n            \"last_name\": \"Doe\"\n        }\n        \n    },\n    \n    \"statement_descriptor_name\": \"joseph\",\n    \n    \"metadata\": {\n        \"udf1\": \"value1\",\n        \"new_customer\": \"true\",\n        \"login_date\": \"2019-09-10T10:11:12Z\"\n    }\n     ,\n     \"browser_info\": {\n         \"user_agent\": \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.110 Safari/537.36\",\n         \"accept_header\": \"text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8\",\n         \"language\": \"nl-NL\",\n         \"color_depth\": 24,\n         \"screen_height\": 723,\n         \"screen_width\": 1536,\n         \"time_zone\": 0,\n         \"java_enabled\": true,\n         \"java_script_enabled\": true,\n         \"ip_address\": \"127.0.0.1\"\n     }\n    \n}",
+    "raw_json_formatted": {
+      "amount": 100,
+      "currency": "USD",
+      "confirm": true,
+      "capture_method": "automatic",
+      "connector": [
+        "nuvei"
+      ],
+      "customer_id": "futurebilling",
+      "email": "guest@example.com",
+      "name": "John Doe",
+      "phone": "999999999",
+      "phone_country_code": "+65",
+      "description": "testing",
+      "authentication_type": "no_three_ds",
+      "return_url": "https://google.com",
+      "payment_method": "card",
+      "payment_method_type": "credit",
+      "setup_future_usage": "off_session",
+      "payment_method_data": {
+        "card": {
+          "card_number": "4111111111111111",
+          "card_exp_month": "12",
+          "card_exp_year": "2030",
+          "card_holder_name": "joseph Doe",
+          "card_cvc": "123"
+        }
+      },
+      "mandate_data": {
+        "customer_acceptance": {
+          "acceptance_type": "offline",
+          "accepted_at": "1963-05-03T04:07:52.723Z",
+          "online": {
+            "ip_address": "127.0.0.1",
+            "user_agent": "amet irure esse"
+          }
+        },
+        "mandate_type": {
+          "multi_use": {
+            "amount": 100,
+            "currency": "USD",
+            "metadata": {
+              "frequency": "1"
+            },
+            "end_date": "2025-05-03T04:07:52.723Z"
+          }
+        }
+      },
+      "billing": {
+        "address": {
+          "line1": "1467",
+          "line2": "jkjj Street",
+          "line3": "no 1111 Street",
+          "city": "San Fransico",
+          "state": "California",
+          "zip": "94122",
+          "country": "JP",
+          "first_name": "joseph",
+          "last_name": "Doe"
+        }
+      },
+      "statement_descriptor_name": "joseph",
+      "metadata": {
+        "udf1": "value1",
+        "new_customer": "true",
+        "login_date": "2019-09-10T10:11:12Z"
+      },
+      "browser_info": {
+        "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.110 Safari/537.36",
+        "accept_header": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8",
+        "language": "nl-NL",
+        "color_depth": 24,
+        "screen_height": 723,
+        "screen_width": 1536,
+        "time_zone": 0,
+        "java_enabled": true,
+        "java_script_enabled": true,
+        "ip_address": "127.0.0.1"
+      }
+    },
     "options": {
       "raw": {
         "language": "json"
