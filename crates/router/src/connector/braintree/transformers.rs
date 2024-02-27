@@ -201,7 +201,7 @@ impl From<BraintreePaymentStatus> for enums::AttemptStatus {
     fn from(item: BraintreePaymentStatus) -> Self {
         match item {
             BraintreePaymentStatus::Succeeded
-            | BraintreePaymentStatus::Settling
+            | BraintreePaymentStatus::Settling | BraintreePaymentStatus::SubmittedForSettlement
             | BraintreePaymentStatus::Settled => Self::Charged,
             BraintreePaymentStatus::AuthorizedExpired => Self::AuthorizationFailed,
             BraintreePaymentStatus::Failed
