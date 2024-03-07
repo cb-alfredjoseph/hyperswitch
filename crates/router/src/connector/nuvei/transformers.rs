@@ -34,6 +34,37 @@ pub struct NuveiMandateMeta {
     pub frequency: String,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct WebhookEvent {
+    #[serde(rename = "EventType")]
+    pub event_type: WebhookEventType,
+    #[serde(rename = "Chargeback")]
+    pub chargeback: Chargeback,
+    #[serde(rename = "TransactionDetails")]
+    pub transaction_details: TransactionDetails,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct Chargeback {
+    #[serde(rename = "Type")]
+    pub chargeback_type: String,
+    #[serde(rename = "ChargebackReason")]
+    pub chargeback_reason: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct TransactionDetails {
+    #[serde(rename = "TransactionId")]
+    pub transaction_id: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub enum WebhookEventType {
+    Chargeback,
+    #[serde(other)]
+    Unknown,
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct NuveiSessionRequest {
@@ -1311,6 +1342,20 @@ pub enum NuveiTransactionType {
     Void,
 }
 
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub enum NuveiWebhookTransactionType {
+    Sale,
+    Auth,
+    Credit,
+    Void,
+    Chargeback,
+    Modification,
+
+    #[serde(other)]
+    #[default]
+    Unknown,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FraudDetails {
@@ -1635,7 +1680,7 @@ fn get_error_response<T>(
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct NuveiWebhookDetails {
     pub ppp_status: Option<String>,
-    #[serde(rename = "ppp_TransactionID")]
+    #[serde(rename = "PPP_TransactionID")]
     pub ppp_transaction_id: String,
     #[serde(rename = "TransactionId")]
     pub transaction_id: Option<String>,
@@ -1661,14 +1706,23 @@ pub struct NuveiWebhookDetails {
 
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct NuveiWebhookTransactionId {
-    #[serde(rename = "ppp_TransactionID")]
+    #[serde(rename = "PPP_TransactionID")]
     pub ppp_transaction_id: String,
+
+    #[serde(rename = "TransactionID")]
+    pub transaction_id: String,
+
+    #[serde(rename = "transactionType")]
+    pub transaction_type: NuveiWebhookTransactionType,
 }
 
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct NuveiWebhookDataStatus {
     #[serde(rename = "Status")]
     pub status: NuveiWebhookStatus,
+
+    #[serde(rename = "transactionType")]
+    pub transaction_type: NuveiWebhookTransactionType,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]

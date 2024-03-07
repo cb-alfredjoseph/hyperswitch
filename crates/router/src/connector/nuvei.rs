@@ -14,6 +14,7 @@ use transformers as nuvei;
 use super::utils::{self, RouterData};
 use crate::{
     configs::settings,
+    connector::nuvei::nuvei::NuveiWebhookTransactionType,
     core::{
         errors::{self, CustomResult},
         payments,
@@ -957,29 +958,96 @@ impl api::IncomingWebhook for Nuvei {
             serde_urlencoded::from_str::<nuvei::NuveiWebhookTransactionId>(&request.query_params)
                 .into_report()
                 .change_context(errors::ConnectorError::WebhookBodyDecodingFailed)?;
-        Ok(api_models::webhooks::ObjectReferenceId::PaymentId(
-            types::api::PaymentIdType::ConnectorTransactionId(body.ppp_transaction_id),
-        ))
+
+        Ok(match body.transaction_type {
+            NuveiWebhookTransactionType::Sale => {
+                api_models::webhooks::ObjectReferenceId::PaymentId(
+                    api_models::payments::PaymentIdType::ConnectorTransactionId(
+                        body.transaction_id,
+                    ),
+                )
+            }
+            NuveiWebhookTransactionType::Credit => {
+                api_models::webhooks::ObjectReferenceId::RefundId(
+                    api_models::webhooks::RefundIdType::ConnectorRefundId(body.transaction_id),
+                )
+            }
+
+            NuveiWebhookTransactionType::Chargeback => {
+                api_models::webhooks::ObjectReferenceId::PaymentId(
+                    api_models::payments::PaymentIdType::ConnectorTransactionId(
+                        body.transaction_id,
+                    ),
+                )
+            }
+            NuveiWebhookTransactionType::Unknown => {
+                return Err(error_stack::Report::new(
+                    errors::ConnectorError::WebhookReferenceIdNotFound,
+                ));
+            }
+            _ => {
+                return Err(error_stack::Report::new(
+                    errors::ConnectorError::WebhookReferenceIdNotFound,
+                ));
+            }
+        })
     }
 
     fn get_webhook_event_type(
         &self,
         request: &api::IncomingWebhookRequestDetails<'_>,
     ) -> CustomResult<api::IncomingWebhookEvent, errors::ConnectorError> {
-        let body =
-            serde_urlencoded::from_str::<nuvei::NuveiWebhookDataStatus>(&request.query_params)
-                .into_report()
-                .change_context(errors::ConnectorError::WebhookBodyDecodingFailed)?;
-        match body.status {
-            nuvei::NuveiWebhookStatus::Approved => {
-                Ok(api::IncomingWebhookEvent::PaymentIntentSuccess)
+        if !request.query_params.is_empty() {
+            let body =
+                serde_urlencoded::from_str::<nuvei::NuveiWebhookDataStatus>(&request.query_params)
+                    .into_report()
+                    .change_context(errors::ConnectorError::WebhookBodyDecodingFailed)?;
+
+            Ok(match body.transaction_type {
+                NuveiWebhookTransactionType::Sale => match body.status {
+                    transformers::NuveiWebhookStatus::Approved => {
+                        api::IncomingWebhookEvent::PaymentIntentSuccess
+                    }
+                    transformers::NuveiWebhookStatus::Declined => {
+                        api::IncomingWebhookEvent::PaymentIntentFailure
+                    }
+                    _ => api::IncomingWebhookEvent::EventNotSupported,
+                },
+
+                NuveiWebhookTransactionType::Credit => match body.status {
+                    transformers::NuveiWebhookStatus::Approved => {
+                        api::IncomingWebhookEvent::RefundSuccess
+                    }
+                    transformers::NuveiWebhookStatus::Declined => {
+                        api::IncomingWebhookEvent::RefundFailure
+                    }
+                    _ => api::IncomingWebhookEvent::EventNotSupported,
+                },
+
+                NuveiWebhookTransactionType::Chargeback => match body.status {
+                    transformers::NuveiWebhookStatus::Approved => {
+                        api::IncomingWebhookEvent::DisputeOpened
+                    }
+                    _ => api::IncomingWebhookEvent::EventNotSupported,
+                },
+
+                NuveiWebhookTransactionType::Unknown => {
+                    api::IncomingWebhookEvent::EventNotSupported
+                }
+                _ => api::IncomingWebhookEvent::EventNotSupported,
+            })
+        } else {
+            let details: transformers::WebhookEvent = request
+                .body
+                .parse_struct("WebhookEvent")
+                .change_context(errors::ConnectorError::WebhookReferenceIdNotFound)?;
+            //println!("webhook_event_type  WebhookEvent parsing {}", details.event_type.clone());
+            match details.event_type {
+                nuvei::WebhookEventType::Chargeback => Ok(api::IncomingWebhookEvent::DisputeOpened),
+                nuvei::WebhookEventType::Unknown => {
+                    Ok(api::IncomingWebhookEvent::EventNotSupported)
+                }
             }
-            nuvei::NuveiWebhookStatus::Declined => {
-                Ok(api::IncomingWebhookEvent::PaymentIntentFailure)
-            }
-            nuvei::NuveiWebhookStatus::Unknown
-            | nuvei::NuveiWebhookStatus::Pending
-            | nuvei::NuveiWebhookStatus::Update => Ok(api::IncomingWebhookEvent::EventNotSupported),
         }
     }
 
