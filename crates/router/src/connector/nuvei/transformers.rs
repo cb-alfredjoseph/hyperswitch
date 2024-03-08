@@ -34,7 +34,7 @@ pub struct NuveiMandateMeta {
     pub frequency: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct WebhookEvent {
     #[serde(rename = "EventType")]
     pub event_type: WebhookEventType,
@@ -44,7 +44,7 @@ pub struct WebhookEvent {
     pub transaction_details: TransactionDetails,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Chargeback {
     #[serde(rename = "Type")]
     pub chargeback_type: String,
@@ -52,16 +52,17 @@ pub struct Chargeback {
     pub chargeback_reason: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct TransactionDetails {
     #[serde(rename = "TransactionId")]
-    pub transaction_id: String,
+    pub transaction_id: i64,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub enum WebhookEventType {
     Chargeback,
     #[serde(other)]
+    #[default]
     Unknown,
 }
 
