@@ -14,7 +14,6 @@ use transformers as nuvei;
 use super::utils::{self, RouterData};
 use crate::{
     configs::settings,
-    connector::nuvei::nuvei::NuveiWebhookTransactionType,
     core::{
         errors::{self, CustomResult},
         payments,
@@ -30,7 +29,8 @@ use crate::{
     },
     utils::ByteSliceExt,
 };
-use crate::connector::nuvei::nuvei::WebhookEventType;
+use crate::connector::nuvei::nuvei::{NuveiTransactionType, NuveiWebhookFormat, WebhookEventType};
+use crate::connector::nuvei::transformers::NuveiWebhookEvent;
 
 #[derive(Debug, Clone)]
 pub struct Nuvei;
@@ -919,10 +919,25 @@ impl api::IncomingWebhook for Nuvei {
         request: &api::IncomingWebhookRequestDetails<'_>,
         _connector_webhook_secrets: &api_models::webhooks::ConnectorWebhookSecrets,
     ) -> CustomResult<Vec<u8>, errors::ConnectorError> {
-        let signature = utils::get_header_key_value("advanceResponseChecksum", request.headers)?;
-        hex::decode(signature)
-            .into_report()
-            .change_context(errors::ConnectorError::WebhookResponseEncodingFailed)
+        let body = get_webhook_content(&request);
+
+        let body_result = body.unwrap();
+
+        match body_result {
+            NuveiWebhookFormat::UrlEncoded(data) => {
+                hex::decode(data.advance_response_checksum)
+                    .into_report()
+                    .change_context(errors::ConnectorError::WebhookSignatureNotFound)
+            },
+            NuveiWebhookFormat::EventPayload(data) => {
+                let signature = utils::get_header_key_value("checksum", request.headers)?;
+                hex::decode(signature)
+                    .into_report()
+                    .change_context(errors::ConnectorError::WebhookResponseEncodingFailed)
+            }
+        }
+
+
     }
 
     fn get_webhook_source_verification_message(
@@ -931,24 +946,38 @@ impl api::IncomingWebhook for Nuvei {
         _merchant_id: &str,
         connector_webhook_secrets: &api_models::webhooks::ConnectorWebhookSecrets,
     ) -> CustomResult<Vec<u8>, errors::ConnectorError> {
-        let body = serde_urlencoded::from_str::<nuvei::NuveiWebhookDetails>(&request.query_params)
-            .into_report()
-            .change_context(errors::ConnectorError::WebhookBodyDecodingFailed)?;
+
         let secret_str = std::str::from_utf8(&connector_webhook_secrets.secret)
             .into_report()
             .change_context(errors::ConnectorError::WebhookBodyDecodingFailed)?;
-        let status = format!("{:?}", body.status).to_uppercase();
-        let to_sign = format!(
-            "{}{}{}{}{}{}{}",
-            secret_str,
-            body.total_amount,
-            body.currency,
-            body.response_time_stamp,
-            body.ppp_transaction_id,
-            status,
-            body.product_id
-        );
-        Ok(to_sign.into_bytes())
+        let body = get_webhook_content(&request);
+
+        let body_result = body.unwrap();
+        match body_result {
+            NuveiWebhookFormat::UrlEncoded(data) => {
+                let status = format!("{:?}", data.status).to_uppercase();
+                let to_sign = format!(
+                    "{}{}{}{}{}{}{}",
+                    secret_str,
+                    data.total_amount,
+                    data.currency,
+                    data.response_time_stamp,
+                    data.ppp_transaction_id,
+                    status,
+                    data.product_id
+                );
+                Ok(to_sign.into_bytes())
+            },
+            NuveiWebhookFormat::EventPayload(data) => {
+                Ok(format!(
+                    "{}{}",
+                    secret_str,
+                    String::from_utf8_lossy(request.body)
+                ).into_bytes())
+            }
+        }
+
+
     }
 
     fn get_webhook_object_reference_id(
@@ -956,61 +985,59 @@ impl api::IncomingWebhook for Nuvei {
         request: &api::IncomingWebhookRequestDetails<'_>,
     ) -> CustomResult<api_models::webhooks::ObjectReferenceId, errors::ConnectorError> {
 
-        if !request.query_params.is_empty() {
-            let body =
-                serde_urlencoded::from_str::<nuvei::NuveiWebhookTransactionId>(&request.query_params)
-                    .into_report()
-                    .change_context(errors::ConnectorError::WebhookBodyDecodingFailed)?;
+        let body = get_webhook_content(&request);
 
-            Ok(match body.transaction_type {
-                NuveiWebhookTransactionType::Sale => {
-                    api_models::webhooks::ObjectReferenceId::PaymentId(
-                        api_models::payments::PaymentIdType::ConnectorTransactionId(
-                            body.transaction_id,
-                        ),
-                    )
-                }
-                NuveiWebhookTransactionType::Credit => {
-                    api_models::webhooks::ObjectReferenceId::RefundId(
-                        api_models::webhooks::RefundIdType::ConnectorRefundId(body.transaction_id),
-                    )
-                }
+        let body_result = body.unwrap();
+        match body_result {
+            NuveiWebhookFormat::UrlEncoded(data) => {
+                Ok(match data.transaction_type {
+                    Some(NuveiTransactionType::Sale) => {
+                        api_models::webhooks::ObjectReferenceId::PaymentId(
+                            api_models::payments::PaymentIdType::ConnectorTransactionId(
+                                data.transaction_id.unwrap(),
+                            ),
+                        )
+                    },
 
-                NuveiWebhookTransactionType::Chargeback => {
-                    api_models::webhooks::ObjectReferenceId::PaymentId(
-                        api_models::payments::PaymentIdType::ConnectorTransactionId(
-                            body.transaction_id,
-                        ),
-                    )
-                }
-                NuveiWebhookTransactionType::Unknown => {
-                    return Err(error_stack::Report::new(
-                        errors::ConnectorError::WebhookReferenceIdNotFound,
-                    ));
-                }
-                _ => {
-                    return Err(error_stack::Report::new(
-                        errors::ConnectorError::WebhookReferenceIdNotFound,
-                    ));
-                }
-            })
-        } else {
-            let details: transformers::WebhookEvent = request
-                .body
-                .parse_struct("WebhookEvent")
-                .change_context(errors::ConnectorError::WebhookEventTypeNotFound)?;
-            Ok(match details.event_type {
-                WebhookEventType::Chargeback => api_models::webhooks::ObjectReferenceId::PaymentId(
-                    api_models::payments::PaymentIdType::ConnectorTransactionId(
-                details.transaction_details.transaction_id.to_string(),
-                    ),
-                ),
-                _ => {
-                    return Err(error_stack::Report::new(
-                        errors::ConnectorError::WebhookReferenceIdNotFound,
-                    ));
-                }
-            })
+                    Some(NuveiTransactionType::Credit) => {
+                        api_models::webhooks::ObjectReferenceId::RefundId(
+                            api_models::webhooks::RefundIdType::ConnectorRefundId(
+                                data.transaction_id.unwrap(),
+                            ),
+                        )
+                    },
+                    Some(NuveiTransactionType::Chargeback) => {
+                        api_models::webhooks::ObjectReferenceId::PaymentId(
+                            api_models::payments::PaymentIdType::ConnectorTransactionId(
+                                data.transaction_id.unwrap(),
+                            ),
+                        )
+                    }
+                    ,
+
+                    _ => {
+                        return Err(error_stack::Report::new(
+                            errors::ConnectorError::WebhookReferenceIdNotFound,
+                        ));
+                    }
+                })
+            },
+            NuveiWebhookFormat::EventPayload(data) => {
+                Ok(match data.event_type {
+                    WebhookEventType::Chargeback => {
+                        api_models::webhooks::ObjectReferenceId::PaymentId(
+                            api_models::payments::PaymentIdType::ConnectorTransactionId(
+                                data.transaction_details.unwrap().transaction_id.to_string()
+                            ),
+                        )
+                    },
+                    _ => {
+                        return Err(error_stack::Report::new(
+                            errors::ConnectorError::WebhookReferenceIdNotFound,
+                        ));
+                    }
+                })
+            }
         }
 
     }
@@ -1019,77 +1046,111 @@ impl api::IncomingWebhook for Nuvei {
         &self,
         request: &api::IncomingWebhookRequestDetails<'_>,
     ) -> CustomResult<api::IncomingWebhookEvent, errors::ConnectorError> {
-        if !request.query_params.is_empty() {
-            let body =
-                serde_urlencoded::from_str::<nuvei::NuveiWebhookDataStatus>(&request.query_params)
-                    .into_report()
-                    .change_context(errors::ConnectorError::WebhookBodyDecodingFailed)?;
 
-            Ok(match body.transaction_type {
-                NuveiWebhookTransactionType::Sale => match body.status {
-                    transformers::NuveiWebhookStatus::Approved => {
-                        api::IncomingWebhookEvent::PaymentIntentSuccess
-                    }
-                    transformers::NuveiWebhookStatus::Declined => {
-                        api::IncomingWebhookEvent::PaymentIntentFailure
-                    }
-                    _ => api::IncomingWebhookEvent::EventNotSupported,
-                },
+        let body = get_webhook_content(&request);
+        let body_result = body.unwrap();
 
-                NuveiWebhookTransactionType::Credit => match body.status {
-                    transformers::NuveiWebhookStatus::Approved => {
-                        api::IncomingWebhookEvent::RefundSuccess
-                    }
-                    transformers::NuveiWebhookStatus::Declined => {
-                        api::IncomingWebhookEvent::RefundFailure
-                    }
-                    _ => api::IncomingWebhookEvent::EventNotSupported,
-                },
+     match body_result {
+         NuveiWebhookFormat::UrlEncoded(data) => {
+             Ok(match data.transaction_type {
+                 Some(NuveiTransactionType::Sale) => match data.status {
+                     transformers::NuveiWebhookStatus::Approved => {
+                         api::IncomingWebhookEvent::PaymentIntentSuccess
+                     }
+                     transformers::NuveiWebhookStatus::Declined => {
+                         api::IncomingWebhookEvent::PaymentIntentFailure
+                     }
+                     _ => api::IncomingWebhookEvent::EventNotSupported,
+                 },
 
-                NuveiWebhookTransactionType::Chargeback => match body.status {
-                    transformers::NuveiWebhookStatus::Approved => {
-                        api::IncomingWebhookEvent::DisputeOpened
-                    }
-                    _ => api::IncomingWebhookEvent::EventNotSupported,
-                },
+                 Some(NuveiTransactionType::Credit) => match data.status {
+                     transformers::NuveiWebhookStatus::Approved => {
+                         api::IncomingWebhookEvent::RefundSuccess
+                     }
+                     transformers::NuveiWebhookStatus::Declined => {
+                         api::IncomingWebhookEvent::RefundFailure
+                     }
+                     _ => api::IncomingWebhookEvent::EventNotSupported,
+                 },
 
-                NuveiWebhookTransactionType::Unknown => {
-                    api::IncomingWebhookEvent::EventNotSupported
-                }
-                _ => api::IncomingWebhookEvent::EventNotSupported,
-            })
-        } else {
-            let details: transformers::WebhookEvent = request
-                .body
-                .parse_struct("WebhookEvent")
-                .change_context(errors::ConnectorError::WebhookEventTypeNotFound)?;
-            match details.event_type {
-                WebhookEventType::Chargeback => Ok(api::IncomingWebhookEvent::DisputeOpened),
-                WebhookEventType::Unknown => {
-                    Ok(api::IncomingWebhookEvent::EventNotSupported)
-                }
-            }
-        }
+                 Some(NuveiTransactionType::Chargeback) => match data.status {
+                     transformers::NuveiWebhookStatus::Approved => {
+                         api::IncomingWebhookEvent::DisputeOpened
+                     }
+                     _ => api::IncomingWebhookEvent::EventNotSupported,
+                 },
+
+                 _ => api::IncomingWebhookEvent::EventNotSupported,
+             })
+         },
+
+         NuveiWebhookFormat::EventPayload(data) => {
+             match data.event_type {
+                 WebhookEventType::Chargeback => Ok(api::IncomingWebhookEvent::DisputeOpened),
+                 WebhookEventType::Unknown => {
+                     Ok(api::IncomingWebhookEvent::EventNotSupported)
+                 }
+             }
+         }
+     }
     }
 
-    fn get_webhook_resource_object(
+
+
+
+
+fn get_webhook_resource_object(
         &self,
         request: &api::IncomingWebhookRequestDetails<'_>,
     ) -> CustomResult<Box<dyn masking::ErasedMaskSerialize>, errors::ConnectorError> {
-        if !request.query_params.is_empty() {
-        let body = serde_urlencoded::from_str::<nuvei::NuveiWebhookDetails>(&request.query_params)
-            .into_report()
-            .change_context(errors::ConnectorError::WebhookBodyDecodingFailed)?;
-        let payment_response = nuvei::NuveiPaymentsResponse::from(body);
-        Ok(Box::new(payment_response))
-        } else {
-            let event_response: transformers::WebhookEvent = request
-                .body
-                .parse_struct("WebhookEvent")
-                .change_context(errors::ConnectorError::WebhookEventTypeNotFound)?;
-            Ok(Box::new(event_response))
+    let body = get_webhook_content(&request);
+
+    let body_result = body.unwrap();
+
+    match body_result {
+        NuveiWebhookFormat::UrlEncoded(data) => {
+            let webhook_details: nuvei::NuveiWebhookDetails = *data;
+
+            let payment_response = nuvei::NuveiPaymentsResponse::from(webhook_details);
+            Ok(Box::new(payment_response))
+        },
+        NuveiWebhookFormat::EventPayload(data) => {
+            Ok(Box::new(data))
         }
     }
+
+    }
+}
+
+
+
+fn get_webhook_content(
+    request: &api::IncomingWebhookRequestDetails<'_>,
+) -> CustomResult<NuveiWebhookFormat, errors::ConnectorError> {
+
+    if !request.query_params.is_empty() {
+        serde_urlencoded::from_str::<NuveiWebhookFormat>(&request.query_params)
+            .into_report()
+            .change_context(errors::ConnectorError::WebhookBodyDecodingFailed)
+    } else {
+        let header_value =
+           utils::get_header_key_value("content-type", request.headers)?;
+        if header_value.eq("application/x-www-form-urlencoded") {
+            let body_str = std::str::from_utf8(&request.body)
+                .map_err(|e| error_stack::Report::new(errors::ConnectorError::WebhookBodyDecodingFailed).attach_printable(e))?
+                .to_string();
+
+            serde_urlencoded::from_str::<NuveiWebhookFormat>(&body_str)
+                .into_report()
+                .change_context(errors::ConnectorError::WebhookBodyDecodingFailed)
+        } else {
+            let event_response = serde_json::from_slice::<NuveiWebhookEvent>(&request.body)
+                .map_err(|e| error_stack::Report::new(errors::ConnectorError::WebhookBodyDecodingFailed).attach_printable(e))?;
+            Ok(NuveiWebhookFormat::EventPayload(Box::new(event_response)))
+        }
+    }
+
+
 }
 
 impl services::ConnectorRedirectResponse for Nuvei {

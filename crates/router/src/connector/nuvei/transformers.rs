@@ -34,15 +34,7 @@ pub struct NuveiMandateMeta {
     pub frequency: String,
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct WebhookEvent {
-    #[serde(rename = "EventType")]
-    pub event_type: WebhookEventType,
-    #[serde(rename = "Chargeback")]
-    pub chargeback: Chargeback,
-    #[serde(rename = "TransactionDetails")]
-    pub transaction_details: TransactionDetails,
-}
+
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Chargeback {
@@ -1341,6 +1333,7 @@ pub enum NuveiTransactionType {
     InitAuth3D,
     Settle,
     Void,
+    Chargeback,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -1678,12 +1671,12 @@ fn get_error_response<T>(
     })
 }
 
-#[derive(Debug, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct NuveiWebhookDetails {
     pub ppp_status: Option<String>,
     #[serde(rename = "PPP_TransactionID")]
     pub ppp_transaction_id: String,
-    #[serde(rename = "TransactionId")]
+    #[serde(rename = "TransactionID")]
     pub transaction_id: Option<String>,
     pub userid: Option<String>,
     pub merchant_unique_id: Option<String>,
@@ -1703,28 +1696,11 @@ pub struct NuveiWebhookDetails {
     pub status: NuveiWebhookStatus,
     #[serde(rename = "transactionType")]
     pub transaction_type: Option<NuveiTransactionType>,
+    #[serde(rename = "advanceResponseChecksum")]
+    pub advance_response_checksum: String,
 }
 
-#[derive(Debug, Default, Serialize, Deserialize)]
-pub struct NuveiWebhookTransactionId {
-    #[serde(rename = "PPP_TransactionID")]
-    pub ppp_transaction_id: String,
 
-    #[serde(rename = "TransactionID")]
-    pub transaction_id: String,
-
-    #[serde(rename = "transactionType")]
-    pub transaction_type: NuveiWebhookTransactionType,
-}
-
-#[derive(Debug, Default, Serialize, Deserialize)]
-pub struct NuveiWebhookDataStatus {
-    #[serde(rename = "Status")]
-    pub status: NuveiWebhookStatus,
-
-    #[serde(rename = "transactionType")]
-    pub transaction_type: NuveiWebhookTransactionType,
-}
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "UPPERCASE")]
@@ -1737,6 +1713,26 @@ pub enum NuveiWebhookStatus {
     #[serde(other)]
     Unknown,
 }
+
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct NuveiWebhookEvent {
+    #[serde(rename = "EventType")]
+    pub event_type: WebhookEventType,
+    #[serde(rename = "Chargeback")]
+    pub chargeback: Option<Chargeback>,
+    #[serde(rename = "TransactionDetails")]
+    pub transaction_details: Option<TransactionDetails>
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(untagged)]
+pub enum NuveiWebhookFormat {
+    UrlEncoded(Box<NuveiWebhookDetails>),
+    EventPayload(Box<NuveiWebhookEvent>),
+}
+
+
 
 impl From<NuveiWebhookStatus> for NuveiTransactionStatus {
     fn from(status: NuveiWebhookStatus) -> Self {
