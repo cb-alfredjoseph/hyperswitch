@@ -615,6 +615,9 @@ impl TryFrom<api_models::enums::BankNames> for NuveiBIC {
             | api_models::enums::BankNames::Starling
             | api_models::enums::BankNames::TsbBank
             | api_models::enums::BankNames::TescoBank
+            | api_models::enums::BankNames::Yoursafe
+            | api_models::enums::BankNames::N26
+            | api_models::enums::BankNames::NationaleNederlanden
             | api_models::enums::BankNames::UlsterBank => {
                 Err(errors::ConnectorError::NotImplemented(
                     utils::get_unimplemented_payment_method_error_message("Nuvei"),
@@ -1357,7 +1360,7 @@ fn build_error_response<T>(
                 http_code,
             ));
             match response.transaction_status {
-                Some(NuveiTransactionStatus::Error) => err,
+                Some(NuveiTransactionStatus::Error) | Some(NuveiTransactionStatus::Declined) => err,
                 _ => match response
                     .gw_error_reason
                     .as_ref()
